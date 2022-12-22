@@ -480,8 +480,8 @@ class DuckChessBoard():
         return 0
     
     def hashKey(self):
-        return np.array2string(self.pieces) + str(self.white_to_move) + str(self.player_can_castle_queenside) \
-            + str(self.player_can_castle_kingside) + str(self.opponent_can_castle_queenside) + str(self.opponent_can_castle_kingside)
+        return f"{np.array2string(self.pieces)}${self.move_count}${self.white_to_move}{self.player_can_castle_queenside}" +\
+            f"{self.player_can_castle_kingside}{self.opponent_can_castle_queenside}{self.opponent_can_castle_kingside}"
 
     def display(self):
         pieces = self.pieces
