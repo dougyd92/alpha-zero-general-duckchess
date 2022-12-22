@@ -425,9 +425,9 @@ class DuckChessBoard():
         # Debug
         if verbose:
             if self.white_to_move:
-                log.debug(f"White moved {rank},{file} to {new_rank},{new_file}")
+                log.debug(f"White moved {rank},{file} to {new_rank},{new_file}, and duck to {duck_rank},{duck_file}")
             else:
-                log.debug(f"Black moved {7-rank},{file} to {7-new_rank},{new_file}")
+                log.debug(f"Black moved {7-rank},{file} to {7-new_rank},{new_file}, and duck to {duck_rank},{duck_file}")
         
         # Check for promotion
         if new_rank == 0 and piece == Pieces.PLAYER_P:
