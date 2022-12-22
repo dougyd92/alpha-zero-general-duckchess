@@ -13,7 +13,7 @@ class DuckChessModel(nn.Module):
         input_channels = self.input_shape[0]
         intermediate_channels = 256
         kernel_size = 3
-        num_residual_blocks = 3
+        num_residual_blocks = 12
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(input_channels, intermediate_channels, kernel_size, stride=1, padding=1),

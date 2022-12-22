@@ -1,12 +1,17 @@
+import logging
+
 import numpy as np
 from enum import IntEnum
+
+log = logging.getLogger(__name__)
 
 # 1 binary layer for duck piece
 # 6 binary layers for white pieces
 # 1 uniform binary layer for current player
 # 6 binary layers for black pieces
 # 4 uniform binary layers for castle eligibility
-NUM_PLANES = 18
+# 1 uniform int layer for number of moves taken
+NUM_PLANES = 19
 
 # 8x8 for which piece to move, 
 # 73 for how that piece is being moved,
@@ -26,6 +31,7 @@ PLAYER_QUEENSIDE_CASTLE_LAYER = 14
 PLAYER_KINGSIDE_CASTLE_LAYER = 15
 OPP_QUEENSIDE_CASTLE_LAYER = 16
 OPP_KINGSIDE_CASTLE_LAYER = 17
+MOVE_COUNT_LAYER = 18
 
 class Pieces(IntEnum):
     PLAYER_P = 1
@@ -83,15 +89,17 @@ class DuckChessBoard():
         self.pieces[0][5] = Pieces.OPPONENT_B
         self.pieces[0][3] = Pieces.OPPONENT_Q
         self.pieces[0][4] = Pieces.OPPONENT_K
+        self.move_count = 0
         self.white_to_move = True
         self.player_can_castle_queenside = True
         self.player_can_castle_kingside = True
         self.opponent_can_castle_queenside = True
         self.opponent_can_castle_kingside = True
-        #TODO move counts, repetition counts?, 50move, and en passant
+        self.duck_location = None
+        #TODO repetition counts?, 50move, and en passant
     
     def encode(self):
-        board = np.zeros((NUM_PLANES, 8, 8), dtype=bool)
+        board = np.zeros((NUM_PLANES, 8, 8))
         for rank in range(8):
             for file in range(8):
                 piece = self.pieces[rank][file]
@@ -101,6 +109,7 @@ class DuckChessBoard():
         board[PLAYER_KINGSIDE_CASTLE_LAYER].fill(self.player_can_castle_kingside)
         board[OPP_QUEENSIDE_CASTLE_LAYER].fill(self.opponent_can_castle_queenside)
         board[OPP_KINGSIDE_CASTLE_LAYER].fill(self.opponent_can_castle_kingside)
+        board[MOVE_COUNT_LAYER].fill(self.move_count)
         if self.white_to_move:
             board[PLAYER_LAYER].fill(True)
         else:
@@ -400,7 +409,7 @@ class DuckChessBoard():
             # TODO underpromotions
             raise Exception(f"Move type {move_type} not implemented yet")
 
-    def performMove(self, action):
+    def performMove(self, action, verbose):
         rank, file, move_type, duck_rank, duck_file = self.decodeAction(action)
 
         # Which pieces is being moved?
@@ -412,6 +421,13 @@ class DuckChessBoard():
         rank_offset, file_offset = self.decodeChessMove(move_type)
         new_rank = rank + rank_offset
         new_file = file + file_offset
+
+        # Debug
+        if verbose:
+            if self.white_to_move:
+                log.debug(f"White moved {rank},{file} to {new_rank},{new_file}")
+            else:
+                log.debug(f"Black moved {7-rank},{file} to {7-new_rank},{new_file}")
         
         # Check for promotion
         if new_rank == 0 and piece == Pieces.PLAYER_P:
@@ -421,8 +437,13 @@ class DuckChessBoard():
         self.pieces[rank][file] = 0
         self.pieces[new_rank][new_file] = piece
 
+        if self.duck_location:
+            old_duck_rank, old_duck_file = self.duck_location
+            self.pieces[old_duck_rank][old_duck_file] = 0
+
         # Negative bc we are about to flip the board to the other player's perspective
         self.pieces[duck_rank][duck_file] = -1 * Pieces.DUCK
+        self.duck_location = (7-duck_rank, duck_file)
 
         # Flip the board around now for other player's perspective
         # Note that this is technically mirrored, so that the 'images' 
@@ -434,20 +455,87 @@ class DuckChessBoard():
         self.pieces[[2,5]] = self.pieces[[5,2]]
         self.pieces[[3,4]] = self.pieces[[4,3]]
 
+        self.move_count += 1
         self.white_to_move = not self.white_to_move
         self.player_can_castle_queenside, self.opponent_can_castle_queenside = self.opponent_can_castle_queenside, self.player_can_castle_queenside
         self.player_can_castle_kingside, self.opponent_can_castle_kingside = self.opponent_can_castle_kingside, self.player_can_castle_kingside
     
-    def checkForGameOver(self):
+    def checkForGameOver(self, verbose):
         # todo stalemates
-        # todo draw due to repetition or move limit
+        # todo draw due to repetition
         if not np.any(self.pieces == Pieces.PLAYER_K):
+            if verbose:
+                if self.white_to_move:
+                    log.info(f"Black wins after {self.move_count} moves")
+                else:
+                    log.info(f"White wins after {self.move_count} moves")
+                self.display()
             return 1
         if not np.any(self.pieces == Pieces.OPPONENT_K):
             # This shouldn't happen, but checking bc not sure which player is which
             raise Exception("Opponent already lost, you shouldn't have another turn")
+        if self.move_count >= 300:
+            # Game is taking too long, call it a draw
+            return 0.1
         return 0
     
     def hashKey(self):
         return np.array2string(self.pieces) + str(self.white_to_move) + str(self.player_can_castle_queenside) \
             + str(self.player_can_castle_kingside) + str(self.opponent_can_castle_queenside) + str(self.opponent_can_castle_kingside)
+
+    def display(self):
+        pieces = self.pieces
+        if not self.white_to_move:
+            # Keep internal representation the same,
+            # but for human display purposes use std notation
+            pieces = -1 *pieces
+            pieces[[0,7]] = pieces[[7,0]]
+            pieces[[1,6]] = pieces[[6,1]]
+            pieces[[2,5]] = pieces[[5,2]]
+            pieces[[3,4]] = pieces[[4,3]]
+
+
+        print("------------------")
+        if self.white_to_move:
+            print("  White to move")
+        else:
+            print("  Black to move")
+        print("------------------")
+        print("  ", end="")
+        for file in range(8):
+            print(file, end=" ")
+        print("")
+        for rank in range(8):
+            print(rank, end=" ")
+            for file in range(8):
+                piece = pieces[rank][file]
+                symbol = '_'
+                if piece == Pieces.PLAYER_P:
+                    symbol = 'P'
+                elif piece == Pieces.PLAYER_R:
+                    symbol = 'R'
+                elif piece == Pieces.PLAYER_N:
+                    symbol = 'N'
+                elif piece == Pieces.PLAYER_B:
+                    symbol = 'B'
+                elif piece == Pieces.PLAYER_K:
+                    symbol = 'K'
+                elif piece == Pieces.PLAYER_Q:
+                    symbol = 'Q'
+                elif piece == Pieces.OPPONENT_P:
+                    symbol = 'p'
+                elif piece == Pieces.OPPONENT_R:
+                    symbol = 'r'
+                elif piece == Pieces.OPPONENT_N:
+                    symbol = 'n'
+                elif piece == Pieces.OPPONENT_B:
+                    symbol = 'b'
+                elif piece == Pieces.OPPONENT_K:
+                    symbol = 'k'
+                elif piece == Pieces.OPPONENT_Q:
+                    symbol = 'q'
+                elif piece == Pieces.DUCK or piece == -1 * Pieces.DUCK:
+                    symbol = '@'
+                print(symbol, end=" ")
+            print("")
+        print("------------------")

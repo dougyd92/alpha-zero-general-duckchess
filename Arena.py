@@ -43,6 +43,9 @@ class Arena():
         it = 0
         while self.game.getGameEnded(board, curPlayer) == 0:
             it += 1
+            if it % 20 == 0:
+                log.info(f"Turn #{it}")
+
             if verbose:
                 assert self.display
                 print("Turn ", str(it), "Player ", str(curPlayer))

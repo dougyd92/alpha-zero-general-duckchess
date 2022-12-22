@@ -34,7 +34,7 @@ class DuckChessGame(Game):
         """
         return ACTION_SIZE
 
-    def getNextState(self, board, player, action):
+    def getNextState(self, board, player, action, verbose=False):
         """
         Input:
             board: current board
@@ -46,7 +46,7 @@ class DuckChessGame(Game):
             nextPlayer: player who plays in the next turn (should be -player)
         """
         new_board = copy.deepcopy(board)
-        new_board.performMove(action)
+        new_board.performMove(action, verbose)
         return new_board, -player
 
     def getValidMoves(self, board, player):
@@ -62,7 +62,7 @@ class DuckChessGame(Game):
         """
         return board.getValidMoves().flatten()
 
-    def getGameEnded(self, board, player):
+    def getGameEnded(self, board, player, verbose=False):
         """
         Input:
             board: current board
@@ -73,7 +73,7 @@ class DuckChessGame(Game):
                small non-zero value for draw.
                
         """
-        return player * board.checkForGameOver() #todo not sure of the sign here
+        return player * board.checkForGameOver(verbose)
 
     def getCanonicalForm(self, board, player):
         """

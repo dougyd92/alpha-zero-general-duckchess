@@ -1,6 +1,6 @@
 import logging
 import math
-
+import time
 import numpy as np
 
 EPS = 1e-8
@@ -34,8 +34,12 @@ class MCTS():
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)
         """
+        start_time = time.time()
         for i in range(self.args.numMCTSSims):
             self.search(canonicalBoard)
+        end_time = time.time()
+        if self.args.verbose:
+            log.info(f"{self.args.numMCTSSims} sims done in {round((end_time - start_time) * 1000)}ms")
 
         s = self.game.stringRepresentation(canonicalBoard)
         counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.game.getActionSize())]
@@ -71,7 +75,6 @@ class MCTS():
         Returns:
             v: the negative of the value of the current canonicalBoard
         """
-
         s = self.game.stringRepresentation(canonicalBoard)
 
         if s not in self.Es:

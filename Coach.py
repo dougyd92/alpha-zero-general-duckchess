@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 from collections import deque
 from pickle import Pickler, Unpickler
 from random import shuffle
@@ -52,18 +53,25 @@ class Coach():
 
         while True:
             episodeStep += 1
+
             canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)
+
+            if self.args.verbose:
+                canonicalBoard.display()
+            if episodeStep % 20 == 0 or self.args.verbose:
+                log.info(f"Turn #{episodeStep}")
+
             temp = int(episodeStep < self.args.tempThreshold)
 
             pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
             sym = self.game.getSymmetries(canonicalBoard, pi)
             for b, p in sym:
-                trainExamples.append([b, self.curPlayer, p, None])
+                trainExamples.append([b.encode(), self.curPlayer, p, None])
 
             action = np.random.choice(len(pi), p=pi)
-            board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action)
+            board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action, verbose=self.args.verbose)
 
-            r = self.game.getGameEnded(board, self.curPlayer)
+            r = self.game.getGameEnded(board, self.curPlayer, verbose=self.args.verbose)
 
             if r != 0:
                 return [(x[0], x[2], r * ((-1) ** (x[1] != self.curPlayer))) for x in trainExamples]
@@ -86,7 +94,10 @@ class Coach():
 
                 for _ in tqdm(range(self.args.numEps), desc="Self Play"):
                     self.mcts = MCTS(self.game, self.nnet, self.args)  # reset search tree
+                    episode_start_time = time.time()
                     iterationTrainExamples += self.executeEpisode()
+                    episode_end_time = time.time()
+                    log.info(f"Game done in {round((episode_end_time - episode_start_time) * 1000)}ms")
 
                 # save the iteration examples to the history 
                 self.trainExamplesHistory.append(iterationTrainExamples)
