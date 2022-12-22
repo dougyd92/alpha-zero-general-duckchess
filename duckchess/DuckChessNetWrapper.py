@@ -15,8 +15,8 @@ import torch.optim as optim
 from .DuckChessNN import DuckChessModel as model
 
 args = dotdict({
-    'lr': 0.001,
-    'dropout': 0.3,
+    'lr': 0.01,
+    'momentum': 0.9,
     'epochs': 3,
     'batch_size': 64,
     'cuda': torch.cuda.is_available(),
@@ -35,7 +35,7 @@ class NNetWrapper(NeuralNet):
         """
         examples: list of examples, each example is of form (board, pi, v)
         """
-        optimizer = optim.Adam(self.model.parameters())
+        optimizer = optim.SGD(self.model.parameters(), lr=args.lr, momentum=args.momentum)
 
         for epoch in range(args.epochs):
             print('EPOCH ::: ' + str(epoch + 1))
