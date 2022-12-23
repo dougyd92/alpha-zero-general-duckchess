@@ -13,3 +13,16 @@ this repo adds an implementation [Duck Chess](https://duckchess.com/) as a learn
 - Coach.py. Modified the training algorithm to continously train a single model, rather than comparing models each iteration and taking the best. This matches the changes made to the training algorithm between AlphaGo-Zero and AlphaZero.
 - MCTS.py. Fixed a memory leak where the old portion of the tree wasn't being discard, leading to linear growth in memory usage and crashes for games with a large number of turns.
 - main.py / Coach.py. Added an arg 'starting_iteration' to avoid overwriting previous examples and models when restarting from a checkpoint. 
+
+## How do I train the model?
+```
+pip install -r  ./requirements.txt
+mkdir ./temp/duckchessv0
+python3 main.py
+```
+
+## How do I play against or evaluate the pretrained model?
+Coming soon! The model is larger than 100mb, so I have to figure out how to upload it. In the meantime, try training an instance of your own!.
+
+## Do you plan on contributing this upstream?
+Yes, eventually. The game rules in DuckChessLogic are still incomplete (e.g. en passant has not been implemented yet). Some of the changes I made to the training framework may be breaking, so I need to test those more carefully with the other games. The memory leak in MCTS seems like something that I can spin off to its own PR.
