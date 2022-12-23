@@ -85,7 +85,7 @@ class Coach():
         only if it wins >= updateThreshold fraction of games.
         """
 
-        for i in range(1, self.args.numIters + 1):
+        for i in range(self.args.starting_iteration, self.args.numIters + 1):
             # bookkeeping
             log.info(f'Starting Iter #{i} ...')
             # examples of the iteration
@@ -142,7 +142,7 @@ class Coach():
                     self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
             else:
                 self.nnet.train(trainExamples)
-                log.info('SAVING CHECKPOINT')
+                log.info(f'SAVING CHECKPOINT: {self.getCheckpointFile(i)}')
                 self.nnet.save_checkpoint(folder=self.args.checkpoint, filename=self.getCheckpointFile(i))
 
 
@@ -154,6 +154,7 @@ class Coach():
         if not os.path.exists(folder):
             os.makedirs(folder)
         filename = os.path.join(folder, self.getCheckpointFile(iteration) + ".examples")
+        log.info(f"Saving examples to {filename}")
         with open(filename, "wb+") as f:
             Pickler(f).dump(self.trainExamplesHistory)
         f.closed

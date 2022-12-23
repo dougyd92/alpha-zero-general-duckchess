@@ -1,12 +1,25 @@
 import logging
 import math
-import time
 import numpy as np
+
+from collections import defaultdict
 
 EPS = 1e-8
 
 log = logging.getLogger(__name__)
 
+class TreeLevel():
+    """
+    Holds all the nodes at a certain tree depth.
+    This is so higher levels can be discarded as the game progresses.
+    """
+    def __init__(self):
+        self.Qsa = {}  # stores Q values for s,a (as defined in the paper)
+        self.Nsa = {}  # stores #times edge s,a was visited
+        self.Ns = {}  # stores #times board s was visited
+        self.Ps = {}  # stores initial policy (returned by neural net)
+        self.Es = {}  # stores game.getGameEnded ended for board s
+        self.Vs = {}  # stores game.getValidMoves for board s
 
 class MCTS():
     """
@@ -17,13 +30,7 @@ class MCTS():
         self.game = game
         self.nnet = nnet
         self.args = args
-        self.Qsa = {}  # stores Q values for s,a (as defined in the paper)
-        self.Nsa = {}  # stores #times edge s,a was visited
-        self.Ns = {}  # stores #times board s was visited
-        self.Ps = {}  # stores initial policy (returned by neural net)
-
-        self.Es = {}  # stores game.getGameEnded ended for board s
-        self.Vs = {}  # stores game.getValidMoves for board s
+        self.nodes = defaultdict(TreeLevel)
 
     def getActionProb(self, canonicalBoard, temp=1):
         """
@@ -34,13 +41,16 @@ class MCTS():
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)
         """
-        start_time = time.time()
         for i in range(self.args.numMCTSSims):
             self.search(canonicalBoard)
-        end_time = time.time()
 
         s = self.game.stringRepresentation(canonicalBoard)
-        counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.game.getActionSize())]
+        depth = canonicalBoard.move_count # use to prune unneeded nodes in the tree
+
+        counts = [self.nodes[depth].Nsa[(s, a)] if (s, a) in self.nodes[depth].Nsa else 0 for a in range(self.game.getActionSize())]
+
+        if (depth-1) in self.nodes:
+            del self.nodes[depth-1] # Discard the parts of the tree that won't be used anymore
 
         if temp == 0:
             bestAs = np.array(np.argwhere(counts == np.max(counts))).flatten()
@@ -52,6 +62,7 @@ class MCTS():
         counts = [x ** (1. / temp) for x in counts]
         counts_sum = float(sum(counts))
         probs = [x / counts_sum for x in counts]
+
         return probs
 
     def search(self, canonicalBoard):
@@ -74,46 +85,47 @@ class MCTS():
             v: the negative of the value of the current canonicalBoard
         """
         s = self.game.stringRepresentation(canonicalBoard)
+        depth = canonicalBoard.move_count
 
-        if s not in self.Es:
-            self.Es[s] = self.game.getGameEnded(canonicalBoard, 1)
-        if self.Es[s] != 0:
+        if s not in self.nodes[depth].Es:
+            self.nodes[depth].Es[s] = self.game.getGameEnded(canonicalBoard, 1)
+        if self.nodes[depth].Es[s] != 0:
             # terminal node
-            return -self.Es[s]
+            return -self.nodes[depth].Es[s]
 
-        if s not in self.Ps:
+        if s not in self.nodes[depth].Ps:
             # leaf node
-            self.Ps[s], v = self.nnet.predict(canonicalBoard)
+            self.nodes[depth].Ps[s], v = self.nnet.predict(canonicalBoard)
             valids = self.game.getValidMoves(canonicalBoard, 1)
-            self.Ps[s] = self.Ps[s] * valids  # masking invalid moves
-            sum_Ps_s = np.sum(self.Ps[s])
+            self.nodes[depth].Ps[s] = self.nodes[depth].Ps[s] * valids  # masking invalid moves
+            sum_Ps_s = np.sum(self.nodes[depth].Ps[s])
             if sum_Ps_s > 0:
-                self.Ps[s] /= sum_Ps_s  # renormalize
+                self.nodes[depth].Ps[s] /= sum_Ps_s  # renormalize
             else:
                 # if all valid moves were masked make all valid moves equally probable
 
                 # NB! All valid moves may be masked if either your NNet architecture is insufficient or you've get overfitting or something else.
                 # If you have got dozens or hundreds of these messages you should pay attention to your NNet and/or training process.   
                 log.error("All valid moves were masked, doing a workaround.")
-                self.Ps[s] = self.Ps[s] + valids
-                self.Ps[s] /= np.sum(self.Ps[s])
+                self.nodes[depth].Ps[s] = self.nodes[depth].Ps[s] + valids
+                self.nodes[depth].Ps[s] /= np.sum(self.nodes[depth].Ps[s])
 
-            self.Vs[s] = valids
-            self.Ns[s] = 0
+            self.nodes[depth].Vs[s] = valids
+            self.nodes[depth].Ns[s] = 0
             return -v
 
-        valids = self.Vs[s]
+        valids = self.nodes[depth].Vs[s]
         cur_best = -float('inf')
         best_act = -1
 
         # pick the action with the highest upper confidence bound
         for a in range(self.game.getActionSize()):
             if valids[a]:
-                if (s, a) in self.Qsa:
-                    u = self.Qsa[(s, a)] + self.args.cpuct * self.Ps[s][a] * math.sqrt(self.Ns[s]) / (
-                            1 + self.Nsa[(s, a)])
+                if (s, a) in self.nodes[depth].Qsa:
+                    u = self.nodes[depth].Qsa[(s, a)] + self.args.cpuct * self.nodes[depth].Ps[s][a] * math.sqrt(self.nodes[depth].Ns[s]) / (
+                            1 + self.nodes[depth].Nsa[(s, a)])
                 else:
-                    u = self.args.cpuct * self.Ps[s][a] * math.sqrt(self.Ns[s] + EPS)  # Q = 0 ?
+                    u = self.args.cpuct * self.nodes[depth].Ps[s][a] * math.sqrt(self.nodes[depth].Ns[s] + EPS)  # Q = 0 ?
 
                 if u > cur_best:
                     cur_best = u
@@ -125,13 +137,13 @@ class MCTS():
 
         v = self.search(next_s)
 
-        if (s, a) in self.Qsa:
-            self.Qsa[(s, a)] = (self.Nsa[(s, a)] * self.Qsa[(s, a)] + v) / (self.Nsa[(s, a)] + 1)
-            self.Nsa[(s, a)] += 1
+        if (s, a) in self.nodes[depth].Qsa:
+            self.nodes[depth].Qsa[(s, a)] = (self.nodes[depth].Nsa[(s, a)] * self.nodes[depth].Qsa[(s, a)] + v) / (self.nodes[depth].Nsa[(s, a)] + 1)
+            self.nodes[depth].Nsa[(s, a)] += 1
 
         else:
-            self.Qsa[(s, a)] = v
-            self.Nsa[(s, a)] = 1
+            self.nodes[depth].Qsa[(s, a)] = v
+            self.nodes[depth].Nsa[(s, a)] = 1
 
-        self.Ns[s] += 1
+        self.nodes[depth].Ns[s] += 1
         return -v
