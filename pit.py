@@ -23,9 +23,7 @@ human_vs_cpu = True
 
 g = DuckChessGame()
 
-# all players
-# rp = RandomPlayer(g).play
-# gp = GreedyOthelloPlayer(g).play
+rp = RandomPlayer(g).play
 hp = HumanDuckChessPlayer(g).play
 
 # nnet players
