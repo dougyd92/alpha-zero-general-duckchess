@@ -38,8 +38,8 @@ args = dotdict({
 
     'checkpoint': './temp/duckchessv0/',
     'load_model': True,
-    'load_folder_file': ('./temp/duckchessv0/','checkpoint_2.pth.tar'),
-    'starting_iteration': 3,    # Set to higher than 1 if resuming from a checkpoint
+    'load_folder_file': ('./temp/duckchessv0/','checkpoint_1.pth.tar'),
+    'starting_iteration': 2,    # Set to higher than 1 if resuming from a checkpoint
     'numItersForTrainExamplesHistory': 2,
     'verbose': False
 })
