@@ -28,4 +28,4 @@ Coming soon! The model is larger than 100mb, so I have to figure out how to uplo
 Yes, eventually. The game rules in DuckChessLogic are still incomplete (e.g. en passant has not been implemented yet). Some of the changes I made to the training framework may be breaking, so I need to test those more carefully with the other games. The memory leak in MCTS seems like something that I can spin off to its own PR.
 
 ## Where can I learn more about this work?
-[DuckZero_FinalReport.pdf](Read the report here)
+[Read the report here](DuckZero_FinalReport.pdf)
